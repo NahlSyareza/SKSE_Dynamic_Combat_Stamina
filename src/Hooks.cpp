@@ -32,12 +32,12 @@ bool IsAttacking(RE::Actor* actor) {
 }
 
 /*This hook doesn't work with god mode??????????*/
-float Hooks::CombatStamina::actionStaminaCost(RE::ActorValueOwner* avOwner, RE::BGSAttackData* atkData) {
+float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::BGSAttackData* atkData) {
     RE::Actor* actor = skyrim_cast<RE::Actor*>(avOwner);
 
     if (!actor) {
         logger::info("Actor not found!");
-        return _actionStaminaCost(avOwner, atkData);
+        return _ActionStaminaCost(avOwner, atkData);
     }
 
     float staminaCostMult = 1.0F;
@@ -102,7 +102,7 @@ float Hooks::CombatStamina::actionStaminaCost(RE::ActorValueOwner* avOwner, RE::
 
         if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
             logger::info("{} is power attacking", actor->GetName());
-            float tempor = _actionStaminaCost(avOwner, atkData);
+            float tempor = _ActionStaminaCost(avOwner, atkData);
             /*Quick fix for detecting hand to hand*/
             staminaCostDmg = tempor > 0 ? tempor : unarmedStamina * powerCostMult;
         }
@@ -120,13 +120,13 @@ P.S. (No, it's the fucking godmode)
 Either stamina draining or block breaking mechanic
 */
 
-void Hooks::CombatHit::hitImpact(RE::Actor* target, RE::HitData& hitData) {
+void Hooks::CombatHit::HitImpact(RE::Actor* target, RE::HitData& hitData) {
     Actor* aggressor = hitData.aggressor.get().get();
 
     /*If there is no target or aggressor, return*/
     if (!target || !aggressor || target->IsDead()) {
         logger::info("Target or aggresor not found");
-        _hitImpact(target, hitData);
+        _HitImpact(target, hitData);
         return;
     }
 
@@ -143,7 +143,7 @@ void Hooks::CombatHit::hitImpact(RE::Actor* target, RE::HitData& hitData) {
         /*Blocked bash do no damage*/
         if (hitData.flags.any(RE::HitData::Flag::kBlocked)) {
             hitData.totalDamage = 0;
-            _hitImpact(target, hitData);
+            _HitImpact(target, hitData);
             return;
         }
 
@@ -158,7 +158,7 @@ void Hooks::CombatHit::hitImpact(RE::Actor* target, RE::HitData& hitData) {
         hitData.totalDamage = 0;
     }
 
-    _hitImpact(target, hitData);
+    _HitImpact(target, hitData);
 }
 
 // Change this with effect-applying restriction

@@ -17,13 +17,13 @@ namespace Hooks {
         static void Install() {
             auto& trampoline = SKSE::GetTrampoline();
             REL::Relocation<uintptr_t> hook{RELOCATION_ID(37650, 38603)};  // SE:627930 + 16E => 3BEC90 AE:64D350 + 171 => 3D6720
-            _actionStaminaCost = trampoline.write_call<5>(hook.address() + REL::Relocate(0x16E, 0x171), actionStaminaCost);
+            _ActionStaminaCost = trampoline.write_call<5>(hook.address() + REL::Relocate(0x16E, 0x171), ActionStaminaCost);
             logger::info("CombatStamina hook installed");
         }
 
     private:
-        static float actionStaminaCost(RE::ActorValueOwner* avOwner, RE::BGSAttackData* atkData);
-        static inline REL::Relocation<decltype(actionStaminaCost)> _actionStaminaCost;
+        static float ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::BGSAttackData* atkData);
+        static inline REL::Relocation<decltype(ActionStaminaCost)> _ActionStaminaCost;
     };
 
     class CombatHit {
@@ -47,13 +47,13 @@ namespace Hooks {
         static void Install() {
             auto& trampoline = SKSE::GetTrampoline();
             REL::Relocation<uintptr_t> hook{REL::RelocationID(37673, 38627)};
-            _hitImpact = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3C0, 0x4A8), hitImpact);
+            _HitImpact = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3C0, 0x4A8), HitImpact);
             logger::info("CombatHit hook installed!");
         }
 
     private:
-        static void hitImpact(RE::Actor* target, RE::HitData& hitData);
-        static inline REL::Relocation<decltype(hitImpact)> _hitImpact;
+        static void HitImpact(RE::Actor* target, RE::HitData& hitData);
+        static inline REL::Relocation<decltype(HitImpact)> _HitImpact;
     };
 
     class CombatAction {
@@ -67,7 +67,6 @@ namespace Hooks {
 
     private:
         static bool DoCombatAction(RE::TESActionData* actData);
-
         static inline REL::Relocation<decltype(DoCombatAction)> _DoCombatAction;
     };
 
