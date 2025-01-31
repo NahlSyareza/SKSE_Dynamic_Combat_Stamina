@@ -1,0 +1,85 @@
+namespace Hooks {
+    class CombatAction {
+    public:
+        static void Install() {
+            auto& trampoline = SKSE::GetTrampoline();
+            REL::Relocation<uintptr_t> hook{RELOCATION_ID(37650, 38603)};  // SE:627930 + 16E => 3BEC90 AE:64D350 + 171 => 3D6720
+            _actionStaminaCost = trampoline.write_call<5>(hook.address() + REL::Relocate(0x16E, 0x171), actionStaminaCost);
+            logger::info("Attack Stamina hook installed");
+        }
+
+    private:
+        static bool isAttacking(RE::Actor* actor) {
+            bool stateAttacking = false;
+            return actor->GetGraphVariableBool("IsAttacking", stateAttacking) && stateAttacking;
+        }
+
+        static bool isBashing(RE::Actor* actor) {
+            bool stateBashing = false;
+            return actor->GetGraphVariableBool("IsBashing", stateBashing) && stateBashing;
+        }
+
+        static float actionStaminaCost(RE::ActorValueOwner* avOwner, RE::BGSAttackData* atkData) {
+            auto* actor = skyrim_cast<RE::Actor*>(avOwner);
+
+            if (actor) {
+                if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
+                    logger::info("{} is power attacking", actor->GetName());
+                }
+
+                if (atkData->data.flags.any(RE::AttackData::AttackFlag::kBashAttack)) {
+                    logger::info("{} is bashing", actor->GetName());
+                    if (actor->GetEquippedObject(true)) {
+                        auto bash = actor->GetEquippedObject(true);
+                        logger::info("{} bashes with {} with the weight of {}", actor->GetName(), bash->GetName(), bash->GetWeight());
+                    } else {
+                        auto bash = actor->GetEquippedObject(false);
+                        logger::info("{} bashes with {} with the weight of {}", actor->GetName(), bash->GetName(), bash->GetWeight());
+                    }
+                }
+
+                logger::info("{} is swinging", actor->GetName());
+                if (actor->GetAttackingWeapon()) {
+                    auto* weap = actor->GetAttackingWeapon()->GetObject()->As<RE::TESObjectWEAP>();
+                    logger::info("{} swings with {} with the weight of {}", actor->GetName(), weap->GetName(), weap->GetWeight());
+                } else {
+                    logger::info("{} swings nothing???", actor->GetName());
+                }
+
+                return _actionStaminaCost(avOwner, atkData);
+            }
+
+            logger::info("Actor not found!");
+
+            return _actionStaminaCost(avOwner, atkData);
+        }
+        static inline REL::Relocation<decltype(actionStaminaCost)> _actionStaminaCost;
+    };
+
+    class Incredibilis {
+    public:
+        static void Install() {
+            auto& trampoline = SKSE::GetTrampoline();
+            REL::Relocation<uintptr_t> hook{REL::RelocationID(37673, 38627)};
+            _bashImpact = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3C0, 0x4A8), bashImpact);
+            logger::info("Bash Impact hook installed!");
+        }
+
+    private:
+        static void bashImpact(RE::Actor* target, RE::HitData& hitData) {
+            if (hitData.flags.any(RE::HitData::Flag::kBash) && !(hitData.flags.any(RE::HitData::Flag::kBlocked))) {
+                logger::info("Incredibilis!");
+            }
+
+            return _bashImpact(target, hitData);
+        }
+
+        static inline REL::Relocation<decltype(bashImpact)> _bashImpact;
+    };
+
+    static void Install() {
+        SKSE::AllocTrampoline(1 << 5);
+        CombatAction::Install();
+        Incredibilis::Install();
+    }
+}
