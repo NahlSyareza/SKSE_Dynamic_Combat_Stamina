@@ -31,31 +31,37 @@ bool IsAttacking(RE::Actor* actor) {
     return actor->GetGraphVariableBool("IsAttacking", state) && state;
 }
 
-/**
- * Doesn't work with god mode
- * Currently not supporting stamina reducing perks
- */
+/*This hook doesn't work with god mode??????????*/
 float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::BGSAttackData* atkData) {
     RE::Actor* actor = skyrim_cast<RE::Actor*>(avOwner);
-    RE::ActorValueInfo* actorInfo = skyrim_cast<RE::ActorValueInfo*>(avOwner);
-
-    if (!actorInfo) {
-        logger::info("Cannot retrieve ActorValueInfo!");
-    }
 
     if (!actor) {
         logger::info("Actor not found!");
         return _ActionStaminaCost(avOwner, atkData);
     }
 
-    float staminaCostDmg = 5.0F;
+    float staminaCostMult = 1.0F;
+    float staminaCostDmg = 0.0F;
+    float powerCostMult = 3.0F;
 
-    float swingMult = 1.0F;
-    float swingBase = 0.0F;
-    float bashMult = 1.0F;
-    float bashBase = 0.0F;
+    float unarmedStamina = 5.0F;
 
-    float powerMult = 5.0F;
+    RE::GameSettingCollection* gameSettings = RE::GameSettingCollection::GetSingleton();
+
+    // How about using these values instead yeaa?
+    RE::Setting* staminaMult = gameSettings->GetSetting("fStaminaAttackWeaponMult");
+    RE::Setting* staminaBase = gameSettings->GetSetting("fStaminaAttackWeaponBase");
+    RE::Setting* staminaPenalty = gameSettings->GetSetting("fPowerAttackStaminaPenalty");
+
+    RE::Setting* staminaBash = gameSettings->GetSetting("fStaminaBashBase");
+    RE::Setting* staminaPowerBash = gameSettings->GetSetting("fStaminaPowerBashBase");
+
+    staminaMult->data.f = powerCostMult * staminaCostMult;
+    staminaBase->data.f = 0.0F;
+    staminaPenalty->data.f = 1.0F;
+
+    staminaBash->data.f = 0.0F;
+    staminaPowerBash->data.f = 0.0F;
 
     const char* isLeft = atkData->IsLeftAttack() ? "Left" : "Right";
     logger::info("{} attack registered", isLeft);
@@ -69,11 +75,16 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         if (actor->GetEquippedObject(true)) {
             TESForm* bash = actor->GetEquippedObject(true);
             logger::info("{} bashes with {}", actor->GetName(), bash->GetName(), bash->GetWeight());
-            staminaCostDmg = (bash->GetWeight() * bashMult) + bashBase;
+            staminaCostDmg = bash->GetWeight() * staminaCostMult;
         } else {
             TESForm* bash = actor->GetEquippedObject(false);
             logger::info("{} bashes with {}", actor->GetName(), bash->GetName(), bash->GetWeight());
-            staminaCostDmg = (bash->GetWeight() * bashMult) + bashBase;
+            staminaCostDmg = bash->GetWeight() * staminaCostMult;
+        }
+
+        if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
+            logger::info("{} is power attacking", actor->GetName());
+            staminaCostDmg *= powerCostMult;
         }
     } else {
         /*
@@ -83,17 +94,25 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         if (actor->GetAttackingWeapon()) {
             TESObjectWEAP* attack = actor->GetAttackingWeapon()->GetObject()->As<RE::TESObjectWEAP>();
             logger::info("{} swings with {}", actor->GetName(), attack->GetName(), staminaCostDmg);
-            staminaCostDmg = (attack->GetWeight() * swingMult) + swingBase;
+            staminaCostDmg = attack->GetWeight() < 1 ? unarmedStamina : attack->GetWeight();
+            staminaCostDmg *= staminaCostMult;
+        } else {
+            logger::info("{} swings nothing???", actor->GetName());
+            staminaCostDmg = unarmedStamina * staminaCostMult;
+        }
+
+        if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
+            logger::info("{} is power attacking", actor->GetName());
+            float tempor = _ActionStaminaCost(avOwner, atkData);
+            logger::info("Power attack stamina consumes {} stamina", ceil(tempor));
+            /*Quick fix for detecting hand to hand*/
+            staminaCostDmg = tempor > 0 ? tempor : unarmedStamina * powerCostMult;
         }
     }
 
-    if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
-        logger::info("{} is power attacking", actor->GetName());
-        staminaCostDmg *= powerMult;
-    }
-
     logger::info("Stamina damage {}", staminaCostDmg);
-    // _ActionStaminaCost(avOwner, atkData);
+    // actor->AsActorValueOwner()->RestoreActorValue(RE::ACTOR_VALUE_MODIFIER::kDamage, RE::ActorValue::kStamina, -staminaCostDmg);
+
     return staminaCostDmg;
 }
 
