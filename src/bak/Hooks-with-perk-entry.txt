@@ -1,7 +1,6 @@
 #include "Hooks.h"
 
 using namespace RE;
-using namespace std;
 
 bool IsRecoiling(RE::Actor* actor) {
     bool state = false;
@@ -74,38 +73,19 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
          */
         TESForm* equip = actor->GetEquippedObject(hasShield);
 
-        if (!equip) {
-            logger::info("Can't detect equipped object");
-            return _ActionStaminaCost(avOwner, atkData);
-        }
-
         if (equip->IsArmor()) {
             // It should be shield
             TESObjectARMO* shield = equip->As<TESObjectARMO>();
             logger::info("{} bashes with {}", actor->GetName(), shield->GetName(), shield->GetWeight());
             staminaCostDmg = (shield->GetWeight() * bashMult) + bashBase;
-
-            logger::info("Cost before: {}", staminaCostDmg);
-            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, shield, addressof(staminaCostDmg));
-            logger::info("Cost after: {}", staminaCostDmg);
         } else if (equip->IsWeapon()) {
             TESObjectWEAP* weapon = equip->As<TESObjectWEAP>();
             logger::info("{} bashes with {}", actor->GetName(), weapon->GetName(), weapon->GetWeight());
             staminaCostDmg = (weapon->GetWeight() * bashMult) + bashBase;
 
-            logger::info("Cost before: {}", staminaCostDmg);
-            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, addressof(staminaCostDmg));
-            logger::info("Cost after: {}", staminaCostDmg);
         } else {
             logger::info("{} bashes with {} ???", actor->GetName(), equip->GetName());
         }
-
-        if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
-            logger::info("{} is power attacking", actor->GetName());
-            staminaCostDmg *= powerMult;
-        }
-
-        return staminaCostDmg * atkData->data.staminaMult;
     } else {
         logger::info("Start swinging");
         /*
@@ -116,24 +96,22 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
             TESObjectWEAP* weapon = actor->GetAttackingWeapon()->GetObject()->As<RE::TESObjectWEAP>();
             logger::info("{} swings with {}", actor->GetName(), weapon->GetName());
             staminaCostDmg = (weapon->GetWeight() * swingMult) + swingBase;
-
-            /**
-             * Is this grouping the comparators legal???
-             */
-            logger::info("Cost before: {}", staminaCostDmg);
-            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, addressof(staminaCostDmg));
-            logger::info("Cost after: {}", staminaCostDmg);
         }
-
-        if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
-            logger::info("{} is power attacking", actor->GetName());
-            staminaCostDmg *= powerMult;
-        }
-
-        return staminaCostDmg * atkData->data.staminaMult;
     }
 
-    return _ActionStaminaCost(avOwner, atkData);
+    if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
+        logger::info("{} is power attacking", actor->GetName());
+        staminaCostDmg *= powerMult;
+    }
+
+    // float copy = staminaCostDmg;
+    // logger::info("Before {}", copy * atkData->data.staminaMult);
+    // RE::BGSEntryPoint::HandleEntryPoint(RE::BGSEntryPoint::ENTRY_POINTS::kModPowerAttackStamina, actor, objToCheck, std::addressof(copy));
+    // logger::info("After {}", copy * atkData->data.staminaMult);
+
+    logger::info("Stamina damage {}", staminaCostDmg);
+    // _ActionStaminaCost(avOwner, atkData);
+    return staminaCostDmg;
 }
 
 /*
