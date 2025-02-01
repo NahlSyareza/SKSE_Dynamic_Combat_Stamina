@@ -37,11 +37,6 @@ bool IsAttacking(RE::Actor* actor) {
  */
 float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::BGSAttackData* atkData) {
     RE::Actor* actor = skyrim_cast<RE::Actor*>(avOwner);
-    RE::ActorValueInfo* actorInfo = skyrim_cast<RE::ActorValueInfo*>(avOwner);
-
-    if (!actorInfo) {
-        logger::info("Cannot retrieve ActorValueInfo!");
-    }
 
     if (!actor) {
         logger::info("Actor not found!");
@@ -60,31 +55,51 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
     const char* isLeft = atkData->IsLeftAttack() ? "Left" : "Right";
     logger::info("{} attack registered", isLeft);
 
-    if (getEquippedShield(actor)) {
+    bool hasShield = getEquippedShield(actor);
+
+    if (hasShield) {
         logger::info("Actor is equipped with shield!");
+    } else {
+        logger::info("Actor is not equipped with shield!");
     }
 
     if (atkData->data.flags.any(RE::AttackData::AttackFlag::kBashAttack)) {
+        logger::info("Start bashing");
+
         /*If bashing*/
-        if (actor->GetEquippedObject(true)) {
-            TESObjectARMO* bash = actor->GetEquippedObject(true)->As<TESObjectARMO>();
-            logger::info("{} bashes with {}", actor->GetName(), bash->GetName(), bash->GetWeight());
-            staminaCostDmg = (bash->GetWeight() * bashMult) + bashBase;
+
+        /**
+         * Potential error by type casting using ->As<>()
+         */
+        TESForm* equip = actor->GetEquippedObject(hasShield);
+
+        if (equip->IsArmor()) {
+            // It should be shield
+            TESObjectARMO* shield = equip->As<TESObjectARMO>();
+            logger::info("{} bashes with {}", actor->GetName(), shield->GetName(), shield->GetWeight());
+            staminaCostDmg = (shield->GetWeight() * bashMult) + bashBase;
+        } else if (equip->IsWeapon()) {
+            TESObjectWEAP* weapon = equip->As<TESObjectWEAP>();
+            logger::info("{} bashes with {}", actor->GetName(), weapon->GetName(), weapon->GetWeight());
+            staminaCostDmg = (weapon->GetWeight() * bashMult) + bashBase;
+
+            // float copy = staminaCostDmg;
+            // logger::info("Before {}", copy * atkData->data.staminaMult);
+            // RE::BGSEntryPoint::HandleEntryPoint(RE::BGSEntryPoint::ENTRY_POINTS::kModPowerAttackStamina, actor, objToCheck, std::addressof(copy));
+            // logger::info("After {}", copy * atkData->data.staminaMult);
         } else {
-            // Potential crash issue
-            TESObjectWEAP* bash = actor->GetEquippedObject(false)->As<TESObjectWEAP>();
-            logger::info("{} bashes with {}", actor->GetName(), bash->GetName(), bash->GetWeight());
-            staminaCostDmg = (bash->GetWeight() * bashMult) + bashBase;
+            logger::info("{} bashes with {} ???", actor->GetName(), equip->GetName());
         }
     } else {
+        logger::info("Start swinging");
         /*
         If is attacking (Can't find a flag for a normal swinging. Flag kNone doesn't work as well as the others, but
         hey there are only swings and bashes anyway. Bow doesn't fire this event so don't worry)
         */
         if (actor->GetAttackingWeapon()) {
-            TESObjectWEAP* attack = actor->GetAttackingWeapon()->GetObject()->As<RE::TESObjectWEAP>();
-            logger::info("{} swings with {}", actor->GetName(), attack->GetName(), staminaCostDmg);
-            staminaCostDmg = (attack->GetWeight() * swingMult) + swingBase;
+            TESObjectWEAP* weapon = actor->GetAttackingWeapon()->GetObject()->As<RE::TESObjectWEAP>();
+            logger::info("{} swings with {}", actor->GetName(), weapon->GetName());
+            staminaCostDmg = (weapon->GetWeight() * swingMult) + swingBase;
         }
     }
 
@@ -92,11 +107,6 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         logger::info("{} is power attacking", actor->GetName());
         staminaCostDmg *= powerMult;
     }
-
-    // float copy = staminaCostDmg;
-    // logger::info("Before {}", copy * atkData->data.staminaMult);
-    // RE::BGSEntryPoint::HandleEntryPoint(RE::BGSEntryPoint::ENTRY_POINTS::kModPowerAttackStamina, actor, objToCheck, std::addressof(copy));
-    // logger::info("After {}", copy * atkData->data.staminaMult);
 
     logger::info("Stamina damage {}", staminaCostDmg);
     // _ActionStaminaCost(avOwner, atkData);
