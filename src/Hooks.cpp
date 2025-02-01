@@ -67,11 +67,12 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
     if (atkData->data.flags.any(RE::AttackData::AttackFlag::kBashAttack)) {
         /*If bashing*/
         if (actor->GetEquippedObject(true)) {
-            TESForm* bash = actor->GetEquippedObject(true);
+            TESObjectARMO* bash = actor->GetEquippedObject(true)->As<TESObjectARMO>();
             logger::info("{} bashes with {}", actor->GetName(), bash->GetName(), bash->GetWeight());
             staminaCostDmg = (bash->GetWeight() * bashMult) + bashBase;
         } else {
-            TESForm* bash = actor->GetEquippedObject(false);
+            // Potential crash issue
+            TESObjectWEAP* bash = actor->GetEquippedObject(false)->As<TESObjectWEAP>();
             logger::info("{} bashes with {}", actor->GetName(), bash->GetName(), bash->GetWeight());
             staminaCostDmg = (bash->GetWeight() * bashMult) + bashBase;
         }
@@ -91,6 +92,11 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         logger::info("{} is power attacking", actor->GetName());
         staminaCostDmg *= powerMult;
     }
+
+    // float copy = staminaCostDmg;
+    // logger::info("Before {}", copy * atkData->data.staminaMult);
+    // RE::BGSEntryPoint::HandleEntryPoint(RE::BGSEntryPoint::ENTRY_POINTS::kModPowerAttackStamina, actor, objToCheck, std::addressof(copy));
+    // logger::info("After {}", copy * atkData->data.staminaMult);
 
     logger::info("Stamina damage {}", staminaCostDmg);
     // _ActionStaminaCost(avOwner, atkData);

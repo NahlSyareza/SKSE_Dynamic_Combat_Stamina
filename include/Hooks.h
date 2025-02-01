@@ -4,6 +4,9 @@
     DTry
     For the hook call functions.
     List of the hook call and the repo where I found them can be found in the readme
+    THANKS TO COLINSWRATH FOR PerkEntry APPLYING METHOD
+
+    https://github.com/colinswrath/BladeAndBlunt/blob/main/include/patches/BashBlockStaminaPatch.h (line 82)
 */
 
 namespace Hooks {
