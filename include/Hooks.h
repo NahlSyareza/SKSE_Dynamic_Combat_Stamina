@@ -21,7 +21,7 @@ namespace Hooks {
             auto& trampoline = SKSE::GetTrampoline();
             REL::Relocation<uintptr_t> hook{RELOCATION_ID(37650, 38603)};  // SE:627930 + 16E => 3BEC90 AE:64D350 + 171 => 3D6720
             _ActionStaminaCost = trampoline.write_call<5>(hook.address() + REL::Relocate(0x16E, 0x171), ActionStaminaCost);
-            logger::info("CombatStamina hook installed");
+            logger::info("CombatStamina hook installed (credits to doodlum, DTry, colinswrath, and everyone from mrowpurr discord server)");
         }
 
     private:
@@ -51,7 +51,7 @@ namespace Hooks {
             auto& trampoline = SKSE::GetTrampoline();
             REL::Relocation<uintptr_t> hook{REL::RelocationID(37673, 38627)};
             _HitImpact = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3C0, 0x4A8), HitImpact);
-            logger::info("CombatHit hook installed!");
+            logger::info("CombatHit hook installed (credits to doodlum, DTry, colinswrath, and everyone from mrowpurr discord server)");
         }
 
     private:
@@ -65,7 +65,7 @@ namespace Hooks {
             auto& trampoline = SKSE::GetTrampoline();
             REL::Relocation<std::uintptr_t> AttackActionBase{RELOCATION_ID(48139, 49170)};
             _DoCombatAction = trampoline.write_call<5>(AttackActionBase.address() + REL::Relocate(0x4D7, 0x435), DoCombatAction);
-            logger::info("hook:OnAttackAction");
+            logger::info("NPC CombatAction hook installed (credits to doodlum, DTry, colinswrath, and everyone from mrowpurr discord server)");
         }
 
     private:
