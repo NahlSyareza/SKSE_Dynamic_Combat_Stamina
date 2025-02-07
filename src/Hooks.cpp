@@ -15,6 +15,20 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         return _ActionStaminaCost(avOwner, atkData);
     }
 
+    RE::GameSettingCollection* gameSettings = RE::GameSettingCollection::GetSingleton();
+
+    // How about using these values instead yeaa?
+    RE::Setting* normalStaminaMult = gameSettings->GetSetting("fDCSNormalStaminaMult");
+    RE::Setting* normalStaminaBase = gameSettings->GetSetting("fDCSNormalStaminaBase");
+    RE::Setting* powerStaminaMult = gameSettings->GetSetting("fDCSPowerStaminaMult");
+    RE::Setting* powerStaminaBase = gameSettings->GetSetting("fDCSPowerStaminaBase");
+
+    if (normalStaminaMult) {
+        logger::info("Normal mult: {}", normalStaminaMult->GetFloat());
+    } else {
+        logger::info("Could not find GMST");
+    }
+
     float staminaCostDmg = 5.0F;
 
     float swingMult = 1.0F;
@@ -86,7 +100,8 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         if (actor->GetAttackingWeapon()) {
             TESObjectWEAP* weapon = actor->GetAttackingWeapon()->GetObject()->As<RE::TESObjectWEAP>();
             logger::info("{} swings with {}", actor->GetName(), weapon->GetName());
-            staminaCostDmg = (weapon->GetWeight() * swingMult) + swingBase;
+            float actualWeight = weapon->GetWeight() < 1 ? 5 : weapon->GetWeight();
+            staminaCostDmg = (actualWeight * swingMult) + swingBase;
 
             logger::info("Cost before: {}", staminaCostDmg);
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, addressof(staminaCostDmg));
