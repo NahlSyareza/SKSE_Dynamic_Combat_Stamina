@@ -67,19 +67,39 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         if (equip->IsArmor()) {
             // It should be shield
             TESObjectARMO* shield = equip->As<TESObjectARMO>();
-            logger::info("{} bashes with {}", actor->GetName(), shield->GetName(), shield->GetWeight());
+            float av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kBlock);
+            int eff = av / 2 < 0 ? 1 : av / 2;
+            logger::info("Efficiency {}% (Block skill {})", eff, av);
+            logger::info("{} bashes with {}", actor->GetName(), shield->GetName(), shield->GetWeight(), av, eff);
             staminaCostDmg = (shield->GetWeight() * bashMult) + bashBase;
+            staminaCostDmg /= eff;
 
             logger::info("Cost before: {}", staminaCostDmg);
-            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, shield, addressof(staminaCostDmg));
+            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, shield, &staminaCostDmg);
             logger::info("Cost after: {}", staminaCostDmg);
         } else if (equip->IsWeapon()) {
             TESObjectWEAP* weapon = equip->As<TESObjectWEAP>();
             logger::info("{} bashes with {}", actor->GetName(), weapon->GetName(), weapon->GetWeight());
+
+            float av = 0;
+            int eff = 1;
+            if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
+                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
+                eff = av / 2 < 0 ? 1 : av / 2;
+                logger::info("Efficiency {}% (One-Handed skill {})", eff, av);
+            } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
+                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
+                eff = av / 2 < 0 ? 1 : av / 2;
+                logger::info("Efficiency {}% (Two-Handed skill {})", eff, av);
+            } else {
+                logger::info("You shouldn't be here!");
+            }
+
             staminaCostDmg = (weapon->GetWeight() * bashMult) + bashBase;
+            staminaCostDmg /= eff;
 
             logger::info("Cost before: {}", staminaCostDmg);
-            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, addressof(staminaCostDmg));
+            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &staminaCostDmg);
             logger::info("Cost after: {}", staminaCostDmg);
         } else {
             logger::info("{} bashes with {} ???", actor->GetName(), equip->GetName());
@@ -100,11 +120,27 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         if (actor->GetAttackingWeapon()) {
             TESObjectWEAP* weapon = actor->GetAttackingWeapon()->GetObject()->As<RE::TESObjectWEAP>();
             logger::info("{} swings with {}", actor->GetName(), weapon->GetName());
+
+            float av = 0;
+            int eff = 1;
+            if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
+                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
+                eff = av / 2 < 0 ? 1 : av / 2;
+                logger::info("Efficiency {}% (One-Handed skill {})", eff, av);
+            } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
+                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
+                eff = av / 2 < 0 ? 1 : av / 2;
+                logger::info("Efficiency {}% (Two-Handed skill {})", eff, av);
+            } else {
+                logger::info("You shouldn't be here!");
+            }
+
             float actualWeight = weapon->GetWeight() < 1 ? 5 : weapon->GetWeight();
             staminaCostDmg = (actualWeight * swingMult) + swingBase;
+            staminaCostDmg /= eff;
 
             logger::info("Cost before: {}", staminaCostDmg);
-            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, addressof(staminaCostDmg));
+            BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &staminaCostDmg);
             logger::info("Cost after: {}", staminaCostDmg);
         }
 
