@@ -78,8 +78,8 @@ namespace Hooks {
 
     static void Install() {
         SKSE::AllocTrampoline(1 << 8);
-        CombatStamina::Install();
-        CombatHit::Install();
-        CombatAction::Install();
-    };
+        Hooks::CombatStamina::Install();
+        Hooks::CombatHit::Install();
+        Hooks::CombatAction::Install();
+    }
 }

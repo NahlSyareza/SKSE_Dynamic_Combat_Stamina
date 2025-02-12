@@ -15,9 +15,11 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         return _ActionStaminaCost(avOwner, atkData);
     }
 
-    RE::GameSettingCollection* gameSettings = RE::GameSettingCollection::GetSingleton();
+    logger::info("{} detected", actor->GetName());
 
-    // How about using these values instead yeaa?
+    auto gameSettings = RE::GameSettingCollection::GetSingleton();
+
+    // How can I get custom GMST pls TwT
     RE::Setting* normalStaminaMult = gameSettings->GetSetting("fDCSNormalStaminaMult");
     RE::Setting* normalStaminaBase = gameSettings->GetSetting("fDCSNormalStaminaBase");
     RE::Setting* powerStaminaMult = gameSettings->GetSetting("fDCSPowerStaminaMult");
@@ -44,11 +46,11 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
 
     bool hasShield = getEquippedShield(actor);
 
-    if (hasShield) {
-        logger::info("Actor is equipped with shield!");
-    } else {
-        logger::info("Actor is not equipped with shield!");
-    }
+    // if (hasShield) {
+    //     logger::info("Is equipped with shield!");
+    // } else {
+    //     logger::info("Is not equipped with shield!");
+    // }
 
     if (atkData->data.flags.any(RE::AttackData::AttackFlag::kBashAttack)) {
         logger::info("Start bashing");
@@ -61,7 +63,7 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         TESForm* equip = actor->GetEquippedObject(hasShield);
 
         if (!equip) {
-            logger::info("Can't detect equipped object");
+            logger::info("Can't detect bash object");
             return _ActionStaminaCost(avOwner, atkData);
         }
 
@@ -70,8 +72,8 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
             TESObjectARMO* shield = equip->As<TESObjectARMO>();
             float av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kBlock);
             float eff = av / 2;
-            logger::info("Efficiency {}% (Block skill {})", eff, av);
-            logger::info("{} bashes with {}", actor->GetName(), shield->GetName(), shield->GetWeight(), av, eff);
+            logger::info("Efficiency {}% (Block skill {})", floor(eff), av);
+            logger::info("Bashes with {}", shield->GetName());
             staminaCostDmg = (shield->GetWeight() * bashMult) + bashBase;
             staminaCostDmg *= (1 - (floor(eff) / 100));
 
@@ -82,17 +84,17 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         } else if (equip->IsWeapon()) {
             // It should be weapon
             TESObjectWEAP* weapon = equip->As<TESObjectWEAP>();
-            logger::info("{} bashes with {}", actor->GetName(), weapon->GetName(), weapon->GetWeight());
+            logger::info("Bashes with {}", weapon->GetName());
             float av = 0;
             float eff = 1;
             if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
                 av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
                 eff = av / 2;
-                logger::info("Efficiency {}% (One-Handed skill {})", eff, av);
+                logger::info("Efficiency {}% (One-Handed skill {})", floor(eff), av);
             } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
                 av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
                 eff = av / 2;
-                logger::info("Efficiency {}% (Two-Handed skill {})", eff, av);
+                logger::info("Efficiency {}% (Two-Handed skill {})", floor(eff), av);
             } else {
                 logger::info("You shouldn't be here!");
             }
@@ -104,15 +106,22 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
             logger::info("Perk mult: {}", perkMult);
         } else {
-            logger::info("{} bashes with {} ???", actor->GetName(), equip->GetName());
+            logger::info("Bashes with {} ???", equip->GetName());
         }
 
         if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
-            logger::info("{} is power attacking", actor->GetName());
-            staminaCostDmg *= powerMult;
+            logger::info("Is Power");
+
+            logger::info("Initial cost: {}", staminaCostDmg);
+            logger::info("Final cost: {}", staminaCostDmg * powerMult * perkMult * atkData->data.staminaMult);
+
+            return staminaCostDmg * powerMult * perkMult * atkData->data.staminaMult;
         }
 
-        return staminaCostDmg * perkMult * atkData->data.staminaMult;
+        logger::info("Initial cost: {}", staminaCostDmg);
+        logger::info("Final cost: {}", staminaCostDmg * atkData->data.staminaMult);
+
+        return staminaCostDmg * atkData->data.staminaMult;
     } else {
         logger::info("Start swinging");
         /**
@@ -124,23 +133,23 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         InventoryEntryData* equip = actor->GetAttackingWeapon();
 
         if (!equip) {
-            logger::info("Can't detect equipped object");
+            logger::info("Can't detect swing object");
             return _ActionStaminaCost(avOwner, atkData);
         }
 
         TESObjectWEAP* weapon = equip->GetObject()->As<RE::TESObjectWEAP>();
-        logger::info("{} swings with {}", actor->GetName(), weapon->GetName());
+        logger::info("Swings with {}", weapon->GetName());
 
         float av = 0;
         float eff = 1;
         if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
             av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
             eff = av / 2;
-            logger::info("Efficiency {}% (One-Handed skill {})", eff, av);
+            logger::info("Efficiency {}% (One-Handed skill {})", floor(eff), av);
         } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
             av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
             eff = av / 2;
-            logger::info("Efficiency {}% (Two-Handed skill {})", eff, av);
+            logger::info("Efficiency {}% (Two-Handed skill {})", floor(eff), av);
         } else {
             logger::info("You shouldn't be here!");
         }
@@ -153,11 +162,19 @@ float Hooks::CombatStamina::ActionStaminaCost(RE::ActorValueOwner* avOwner, RE::
         logger::info("Perk mult: {}", perkMult);
 
         if (atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack)) {
-            logger::info("{} is power attacking", actor->GetName());
-            staminaCostDmg *= powerMult;
+            logger::info("Is Power", actor->GetName());
+            // staminaCostDmg *= powerMult;
+
+            logger::info("Initial cost: {}", staminaCostDmg);
+            logger::info("Final cost: {}", staminaCostDmg * powerMult * perkMult * atkData->data.staminaMult);
+
+            return staminaCostDmg * powerMult * perkMult * atkData->data.staminaMult;
         }
 
-        return staminaCostDmg * perkMult * atkData->data.staminaMult;
+        logger::info("Initial cost: {}", staminaCostDmg);
+        logger::info("Final cost: {}", staminaCostDmg * atkData->data.staminaMult);
+
+        return staminaCostDmg * atkData->data.staminaMult;
     }
 
     return _ActionStaminaCost(avOwner, atkData);
