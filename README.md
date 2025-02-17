@@ -30,6 +30,11 @@ Automatically imports:
 - [CLibUtil](https://github.com/powerof3/CLibUtil) by powerof3
 - [SKSE Menu Framework](https://www.nexusmods.com/skyrimspecialedition/mods/120352) by Thiago099
 
-Template Credit:
+Template credit:
 
 - [Quantumyilmaz](https://github.com/Quantumyilmaz/SKSE_template)
+
+Hooks credits:
+- [doodlum](https://github.com/doodlum/skyrim-poise/blob/main/src/Hooks/HitEventHandler.cpp)
+- [colinswrath](https://github.com/colinswrath/BladeAndBlunt/blob/main/include/patches/BashBlockStaminaPatch.h)
+- [DTry]()

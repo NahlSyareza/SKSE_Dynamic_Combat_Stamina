@@ -33,7 +33,7 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         logger::info("Could not find GMST");
     }
 
-    float costBase = 5.0F;
+    float costBase = 1.0F;
 
     float swingMult = 1.0F;
     float swingBase = 0.0F;
@@ -77,7 +77,7 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             logger::info("Efficiency {}% (Block skill {})", floor(eff), av);
             logger::info("Bashes with {}", shield->GetName());
             costBase = (shield->GetWeight() * bashMult) + bashBase;
-            costBase *= (1 - (floor(eff) / 100));
+            costBase *= 1 - (floor(eff) / 100);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, shield, &perkMult);
@@ -91,18 +91,21 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             float eff = 1;
             if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
                 av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
-                eff = av / 2;
-                logger::info("Efficiency {}% (One-Handed skill {})", floor(eff), av);
+                logger::info("Efficiency {}% (One-Handed skill {})", floor(av / 2), av);
             } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
                 av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
-                eff = av / 2;
-                logger::info("Efficiency {}% (Two-Handed skill {})", floor(eff), av);
+                logger::info("Efficiency {}% (Two-Handed skill {})", floor(av / 2), av);
+            } else if (weapon->IsCrossbow() || weapon->IsBow()) {
+                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kArchery);
+                logger::info("Efficiency {}% (Archery skill {})", floor(av / 2), av);
             } else {
                 logger::info("You shouldn't be here!");
             }
 
+            eff = av / 2;
+
             costBase = (weapon->GetWeight() * bashMult) + bashBase;
-            costBase *= (1 - (floor(eff) / 100));
+            costBase *= 1 - (floor(eff) / 100);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
@@ -146,19 +149,19 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         float eff = 1;
         if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
             av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
-            eff = av / 2;
-            logger::info("Efficiency {}% (One-Handed skill {})", floor(eff), av);
+            logger::info("Efficiency {}% (One-Handed skill {})", floor(av / 2), av);
         } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
             av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
-            eff = av / 2;
-            logger::info("Efficiency {}% (Two-Handed skill {})", floor(eff), av);
+            logger::info("Efficiency {}% (Two-Handed skill {})", floor(av / 2), av);
         } else {
             logger::info("You shouldn't be here!");
         }
 
-        float actualWeight = weapon->GetWeight() < 1 ? 5 : weapon->GetWeight();
+        eff = av / 2;
+
+        float actualWeight = weapon->GetWeight() < 1 ? costBase : weapon->GetWeight();
         costBase = (actualWeight * swingMult) + swingBase;
-        costBase *= (1 - (floor(eff) / 100));
+        costBase *= 1 - (floor(eff) / 100);
 
         BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
         logger::info("Perk mult: {}", perkMult);
@@ -182,8 +185,18 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
     return _ActionStaminaCost(avOwner, atkData);
 }
 
+float calculateEfficiency(Actor* actor, ActorValue av) {
+    float av = actor->AsActorValueOwner()->GetActorValue(av);
+    float eff = 0.0F;
+
+    eff = av / 2;
+
+    return 1 - (floor(eff) / 100);
+}
+
 // Currently unused
 void Hooks::CombatHit::HitImpact(Actor* target, HitData& hitData) { _HitImpact(target, hitData); }
+
 bool Hooks::CombatAction::DoCombatAction(TESActionData* actData) {
     Actor* actor = actData->source.get()->As<Actor>();
 
