@@ -3,7 +3,6 @@
 #include "mini/ini.h"
 
 using namespace RE;
-// using namespace std;
 
 /**
  * Doesn't work with god mode
@@ -17,34 +16,36 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         return _ActionStaminaCost(avOwner, atkData);
     }
 
-    logger::info("{} detected", actor->GetName());
+    ATTACK_STATE_ENUM att_st = actor->AsActorState()->GetAttackState();
 
-    auto gameSettings = GameSettingCollection::GetSingleton();
+    switch (att_st) {
+        case ATTACK_STATE_ENUM::kBash:
+            logger::info("{} bash enum detected!", actor->GetName());
+            break;
 
-    // How can I get custom GMST pls TwT
-    Setting* normalStaminaMult = gameSettings->GetSetting("fDCSNormalStaminaMult");
-    Setting* normalStaminaBase = gameSettings->GetSetting("fDCSNormalStaminaBase");
-    Setting* powerStaminaMult = gameSettings->GetSetting("fDCSPowerStaminaMult");
-    Setting* powerStaminaBase = gameSettings->GetSetting("fDCSPowerStaminaBase");
+        case ATTACK_STATE_ENUM::kHit:
+            logger::info("{} hit enum detected!", actor->GetName());
+            break;
 
-    if (normalStaminaMult) {
-        logger::info("Normal mult: {}", normalStaminaMult->GetFloat());
-    } else {
-        logger::info("Could not find GMST");
+        default:
+            logger::info("{} enum not detected!", actor->GetName());
+            break;
     }
 
-    float costBase = 1.0F;
+    auto mini = mINI::GetIniFile("Data/SKSE/Plugins/DCS-DynamicCombatStamina.ini");
 
-    float swingMult = 1.0F;
-    float swingBase = 0.0F;
-    float bashMult = 1.0F;
-    float bashBase = 0.0F;
-    float perkMult = 1.0F;
+    float testValue = mINI::GetIniFloat(mini, "Test", "value");
 
-    float powerMult = 5.0F;
+    logger::info("INI testing value: {}", testValue);
 
-    // const char* isLeft = atkData->IsLeftAttack() ? "Left" : "Right";
-    // logger::info("{} attack registered", isLeft);
+    logger::info("{} detected", actor->GetName());
+
+    float costBase = mINI::GetIniFloat(mini, "Configurations", "costBase");
+
+    // Not configurable cuz it's not meant to be
+    float perkMult = 1;
+
+    float powerMult = mINI::GetIniFloat(mini, "Configurations", "powerMult");
 
     bool hasShield = Hooks::getEquippedShield(actor);
 
@@ -55,13 +56,13 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
     // }
 
     if (atkData->data.flags.any(AttackData::AttackFlag::kBashAttack)) {
+        float bashBase = mINI::GetIniFloat(mini, "Configurations", "bashBase");
+        float bashMult = mINI::GetIniFloat(mini, "Configurations", "bashMult");
+
         logger::info("Start bashing");
 
         /*If bashing*/
 
-        /**
-         * Potential error by type casting using ->As<>()
-         */
         TESForm* equip = actor->GetEquippedObject(hasShield);
 
         if (!equip) {
@@ -69,15 +70,17 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             return costBase * atkData->data.staminaMult;
         }
 
+        float skillEfficiency = 0;
         if (equip->IsArmor()) {
             // It should be shield
             TESObjectARMO* shield = equip->As<TESObjectARMO>();
-            float av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kBlock);
-            float eff = av / 2;
-            logger::info("Efficiency {}% (Block skill {})", floor(eff), av);
+
+            float actualWeight = shield->GetWeight() < 1 ? 1 : shield->GetWeight();
+            calculateSkillEfficiency(actor, ActorValue::kBlock, &skillEfficiency);
+            logger::info("Efficiency {}% (Block skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kBlock));
             logger::info("Bashes with {}", shield->GetName());
-            costBase = (shield->GetWeight() * bashMult) + bashBase;
-            costBase *= 1 - (floor(eff) / 100);
+            // costBase = ((shield->GetWeight() * bashMult) + bashBase) * skillEfficiency;
+            calculateStaminaCost(actualWeight, bashBase, bashMult, skillEfficiency, &costBase);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, shield, &perkMult);
@@ -86,26 +89,24 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         } else if (equip->IsWeapon()) {
             // It should be weapon
             TESObjectWEAP* weapon = equip->As<TESObjectWEAP>();
-            logger::info("Bashes with {}", weapon->GetName());
-            float av = 0;
-            float eff = 1;
+            float actualWeight = weapon->GetWeight() < 1 ? costBase : weapon->GetWeight();
+            logger::info("Bashes with {} (weight {})", weapon->GetName(), actualWeight);
+
             if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
-                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
-                logger::info("Efficiency {}% (One-Handed skill {})", floor(av / 2), av);
+                calculateSkillEfficiency(actor, ActorValue::kOneHanded, &skillEfficiency);
+                logger::info("Efficiency {}% (One-Handed skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded));
             } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
-                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
-                logger::info("Efficiency {}% (Two-Handed skill {})", floor(av / 2), av);
+                calculateSkillEfficiency(actor, ActorValue::kTwoHanded, &skillEfficiency);
+                logger::info("Efficiency {}% (Two-Handed skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded));
             } else if (weapon->IsCrossbow() || weapon->IsBow()) {
-                av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kArchery);
-                logger::info("Efficiency {}% (Archery skill {})", floor(av / 2), av);
+                calculateSkillEfficiency(actor, ActorValue::kArchery, &skillEfficiency);
+                logger::info("Efficiency {}% (Archery skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kArchery));
             } else {
                 logger::info("You shouldn't be here!");
             }
 
-            eff = av / 2;
-
-            costBase = (weapon->GetWeight() * bashMult) + bashBase;
-            costBase *= 1 - (floor(eff) / 100);
+            // costBase = ((weapon->GetWeight() * bashMult) + bashBase) * skillEfficiency;
+            calculateStaminaCost(actualWeight, bashBase, bashMult, skillEfficiency, &costBase);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
@@ -117,17 +118,18 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         if (atkData->data.flags.any(AttackData::AttackFlag::kPowerAttack)) {
             logger::info("Is Power");
 
-            logger::info("Initial cost: {}", costBase);
-            logger::info("Final cost: {}", costBase * powerMult * perkMult * atkData->data.staminaMult);
+            logger::info("Stamina cost: {}", costBase * powerMult * perkMult * atkData->data.staminaMult);
 
             return costBase * powerMult * perkMult * atkData->data.staminaMult;
         }
 
-        logger::info("Initial cost: {}", costBase);
-        logger::info("Final cost: {}", costBase * atkData->data.staminaMult);
+        logger::info("Stamina cost: {}", costBase * atkData->data.staminaMult);
 
         return costBase * atkData->data.staminaMult;
     } else {
+        float swingBase = mINI::GetIniFloat(mini, "Configurations", "swingBase");
+        float swingMult = mINI::GetIniFloat(mini, "Configurations", "swingMult");
+
         logger::info("Start swinging");
         /**
          * If is attacking (Can't find a flag for a normal swinging. Flag kNone doesn't work as well as the others, but
@@ -145,39 +147,38 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         TESObjectWEAP* weapon = equip->GetObject()->As<TESObjectWEAP>();
         logger::info("Swings with {}", weapon->GetName());
 
-        float av = 0;
-        float eff = 1;
+        // float tester = 0;
+        // Hooks::CombatStamina::calculateSkillEfficiency(actor, ActorValue::kOneHanded, &tester);
+        // logger::info("Test value of One-Handed: {}", tester);
+
+        float skillEfficiency = 0;
         if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
-            av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded);
-            logger::info("Efficiency {}% (One-Handed skill {})", floor(av / 2), av);
+            calculateSkillEfficiency(actor, ActorValue::kOneHanded, &skillEfficiency);
+            logger::info("Efficiency {}% (One-Handed skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded));
         } else if (weapon->IsTwoHandedAxe() || weapon->IsTwoHandedSword()) {
-            av = actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded);
-            logger::info("Efficiency {}% (Two-Handed skill {})", floor(av / 2), av);
+            calculateSkillEfficiency(actor, ActorValue::kTwoHanded, &skillEfficiency);
+            logger::info("Efficiency {}% (Two-Handed skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kTwoHanded));
         } else {
             logger::info("You shouldn't be here!");
         }
 
-        eff = av / 2;
-
         float actualWeight = weapon->GetWeight() < 1 ? costBase : weapon->GetWeight();
-        costBase = (actualWeight * swingMult) + swingBase;
-        costBase *= 1 - (floor(eff) / 100);
+        // costBase = ((actualWeight * swingMult) + swingBase) * skillEfficiency;
+
+        // At the minimum, 1 stamina must be spent
+        calculateStaminaCost(actualWeight, swingBase, swingMult, skillEfficiency, &costBase);
 
         BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
         logger::info("Perk mult: {}", perkMult);
 
         if (atkData->data.flags.any(AttackData::AttackFlag::kPowerAttack)) {
             logger::info("Is Power", actor->GetName());
-            // costBase *= powerMult;
-
-            logger::info("Initial cost: {}", costBase);
-            logger::info("Final cost: {}", costBase * powerMult * perkMult * atkData->data.staminaMult);
+            logger::info("Stamina cost: {}", costBase * powerMult * perkMult * atkData->data.staminaMult);
 
             return costBase * powerMult * perkMult * atkData->data.staminaMult;
         }
 
-        logger::info("Initial cost: {}", costBase);
-        logger::info("Final cost: {}", costBase * atkData->data.staminaMult);
+        logger::info("Stamina cost: {}", costBase * atkData->data.staminaMult);
 
         return costBase * atkData->data.staminaMult;
     }
@@ -185,13 +186,15 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
     return _ActionStaminaCost(avOwner, atkData);
 }
 
-float calculateEfficiency(Actor* actor, ActorValue av) {
-    float av = actor->AsActorValueOwner()->GetActorValue(av);
-    float eff = 0.0F;
+void Hooks::CombatStamina::calculateStaminaCost(float weight, float base, float mult, float efficiency, float* ret) { *ret = ((weight * mult) + base) * efficiency; }
 
-    eff = av / 2;
+void Hooks::CombatStamina::calculateSkillEfficiency(Actor* actor, ActorValue av, float* ret) {
+    float value = actor->AsActorValueOwner()->GetActorValue(av);
+    float eff = 0;
 
-    return 1 - (floor(eff) / 100);
+    eff = value / 2;
+
+    *ret = 1 - (floor(eff) / 100);
 }
 
 // Currently unused
@@ -207,11 +210,30 @@ bool Hooks::CombatAction::DoCombatAction(TESActionData* actData) {
     float stamina = actor->AsActorValueOwner()->GetActorValue(ActorValue::kStamina);
     const char* event = actData->animEvent.c_str();
 
-    if (strstr(event, "attack") && stamina <= 0) {
+    if (stamina <= 0 && (strstr(event, "attack") || strstr(event, "bash") || strstr(event, "block"))) {
         logger::info("{} tries to attack, but have no stamina!", actor->GetName());
 
         return false;
     }
 
     return _DoCombatAction(actData);
+}
+
+void Hooks::CombatRegenerate::RegenerateCheck(Actor* actor, ActorValue av, float rate) {
+    auto mini = mINI::GetIniFile("Data/SKSE/Plugins/DCS-DynamicCombatStamina.ini");
+    bool noRegenAttack = mINI::GetIniBool(mini, "Experimental", "noRegenAttack");
+
+    if (!actor) {
+        _RestoreActorValue(actor, av, rate);
+    }
+
+    switch (av) {
+        case ActorValue::kStamina:
+            if (actor->IsAttacking() && noRegenAttack) {
+                return;
+            }
+            break;
+    }
+
+    _RestoreActorValue(actor, av, rate);
 }

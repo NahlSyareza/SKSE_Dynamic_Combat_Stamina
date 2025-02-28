@@ -17,6 +17,10 @@ namespace Hooks {
             return &singleton;
         }
 
+        // Helper functions, they don't contribute anything to hook calls
+        static void calculateSkillEfficiency(RE::Actor* actor, RE::ActorValue av, float* ret);
+        static void calculateStaminaCost(float weight, float base, float mult, float efficiency, float* ret);
+
         static void Install() {
             auto& trampoline = SKSE::GetTrampoline();
             REL::Relocation<uintptr_t> hook{RELOCATION_ID(37650, 38603)};  // SE:627930 + 16E => 3BEC90 AE:64D350 + 171 => 3D6720
@@ -39,13 +43,14 @@ namespace Hooks {
         bool appliedStagger = false;
         std::thread::id staggerThread;
 
-        static void TryStagger(RE::Actor* a_target, float a_staggerMult, RE::Actor* a_aggressor) {
-            GetSingleton()->appliedStagger = true;
-            GetSingleton()->staggerThread = std::this_thread::get_id();
-            using func_t = decltype(&TryStagger);
-            REL::Relocation<func_t> func{REL::RelocationID(36700, 37710)};
-            func(a_target, a_staggerMult, a_aggressor);
-        }
+        // Unused now, but still want to keep
+        // static void TryStagger(RE::Actor* a_target, float a_staggerMult, RE::Actor* a_aggressor) {
+        //     GetSingleton()->appliedStagger = true;
+        //     GetSingleton()->staggerThread = std::this_thread::get_id();
+        //     using func_t = decltype(&TryStagger);
+        //     REL::Relocation<func_t> func{REL::RelocationID(36700, 37710)};
+        //     func(a_target, a_staggerMult, a_aggressor);
+        // }
 
         static void Install() {
             auto& trampoline = SKSE::GetTrampoline();
@@ -73,6 +78,25 @@ namespace Hooks {
         static inline REL::Relocation<decltype(DoCombatAction)> _DoCombatAction;
     };
 
+    class CombatRegenerate {
+    public:
+        static CombatRegenerate* GetSingleton() {
+            static CombatRegenerate singleton;
+            return &singleton;
+        }
+
+        static void Install() {
+            auto& trampoline = SKSE::GetTrampoline();
+            REL::Relocation<std::uintptr_t> address{RELOCATION_ID(37510, 38452)};
+            _RestoreActorValue = trampoline.write_call<5>(address.address() + REL::Relocate(0x176, 0xE1), RegenerateCheck);
+            logger::info("Actor Value Regenerate hook installed (credits to doodlum, DTry, colinswrath, and everyone from mrowpurr discord server)");
+        }
+
+    private:
+        static void RegenerateCheck(RE::Actor* actor, RE::ActorValue av, float rate);
+        static inline REL::Relocation<decltype(RegenerateCheck)> _RestoreActorValue;
+    };
+
     typedef RE::TESObjectREFR*(_fastcall* _getEquippedShield)(RE::Actor* a_actor);
     inline static REL::Relocation<_getEquippedShield> getEquippedShield{RELOCATION_ID(37624, 38577)};
 
@@ -81,5 +105,6 @@ namespace Hooks {
         Hooks::CombatStamina::Install();
         Hooks::CombatHit::Install();
         Hooks::CombatAction::Install();
+        Hooks::CombatRegenerate::Install();
     }
 }
