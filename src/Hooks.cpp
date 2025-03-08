@@ -8,6 +8,33 @@ using namespace RE;
  * Doesn't work with god mode
  */
 
+bool IsRightCasting(RE::Actor* actor) {
+    bool state = false;
+    return actor->GetGraphVariableBool("IsCastingRight", state) && state;
+}
+
+bool IsLeftCasting(RE::Actor* actor) {
+    bool state = false;
+    return actor->GetGraphVariableBool("IsCastingLeft", state) && state;
+}
+
+bool IsDualCasting(RE::Actor* actor) {
+    bool state = false;
+    return actor->GetGraphVariableBool("IsCastingDual", state) && state;
+}
+
+bool IsCasting(RE::Actor* actor) { return IsRightCasting(actor) || IsLeftCasting(actor) || IsDualCasting(actor); }
+
+bool IsAttacking(RE::Actor* actor) {
+    bool state = false;
+    return actor->GetGraphVariableBool("IsAttacking", state) && state;
+}
+
+bool IsBlocking(RE::Actor* actor) {
+    bool state = false;
+    return actor->GetGraphVariableBool("Isblocking", state) && state;
+}
+
 float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttackData* atkData) {
     Actor* actor = skyrim_cast<Actor*>(avOwner);
 
@@ -198,7 +225,34 @@ void Hooks::CombatStamina::calculateSkillEfficiency(Actor* actor, ActorValue av,
 }
 
 // Currently unused
-void Hooks::CombatHit::HitImpact(Actor* target, HitData& hitData) { _HitImpact(target, hitData); }
+void Hooks::CombatHit::HitImpact(Actor* target, HitData& hitData) {
+    auto mini = mINI::GetIniFile("Data/SKSE/Plugins/DCS-DynamicCombatStamina.ini");
+    bool enableContextualStagger = mINI::GetIniBool(mini, "Experimental", "enableContextualStagger");
+    Actor* source = hitData.aggressor.get().get();
+
+    if (!target || !source) {
+        _HitImpact(target, hitData);
+        return;
+    }
+
+    float& stgAmt = hitData.stagger;
+
+    if (enableContextualStagger) {
+        if (hitData.flags.any(RE::HitData::Flag::kBash) && !IsBlocking(target) && !IsAttacking(target) && !IsCasting(target)) {
+            logger::info("Resist Stagger: Bashed while idle");
+            hitData.stagger = 0.0F;
+        }
+
+        if (hitData.flags.any(RE::HitData::Flag::kPowerAttack) && IsBlocking(target)) {
+            logger::info("Resist Stagger: Power attack is blocked");
+            hitData.stagger = 0.0F;
+        }
+    }
+
+    logger::info("Stagger received: {}", stgAmt);
+
+    _HitImpact(target, hitData);
+}
 
 bool Hooks::CombatAction::DoCombatAction(TESActionData* actData) {
     Actor* actor = actData->source.get()->As<Actor>();
@@ -221,7 +275,7 @@ bool Hooks::CombatAction::DoCombatAction(TESActionData* actData) {
 
 void Hooks::CombatRegenerate::RegenerateCheck(Actor* actor, ActorValue av, float rate) {
     auto mini = mINI::GetIniFile("Data/SKSE/Plugins/DCS-DynamicCombatStamina.ini");
-    bool noRegenAttack = mINI::GetIniBool(mini, "Experimental", "noRegenAttack");
+    bool enableRegenAttack = mINI::GetIniBool(mini, "Experimental", "enableRegenAttack");
 
     if (!actor) {
         _RestoreActorValue(actor, av, rate);
@@ -229,7 +283,7 @@ void Hooks::CombatRegenerate::RegenerateCheck(Actor* actor, ActorValue av, float
 
     switch (av) {
         case ActorValue::kStamina:
-            if (actor->IsAttacking() && noRegenAttack) {
+            if (actor->IsAttacking() && !enableRegenAttack) {
                 return;
             }
             break;
