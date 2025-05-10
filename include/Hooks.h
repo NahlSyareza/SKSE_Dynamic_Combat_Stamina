@@ -44,13 +44,13 @@ namespace Hooks {
         std::thread::id staggerThread;
 
         // Unused now, but still want to keep
-        // static void TryStagger(RE::Actor* a_target, float a_staggerMult, RE::Actor* a_aggressor) {
-        //     GetSingleton()->appliedStagger = true;
-        //     GetSingleton()->staggerThread = std::this_thread::get_id();
-        //     using func_t = decltype(&TryStagger);
-        //     REL::Relocation<func_t> func{REL::RelocationID(36700, 37710)};
-        //     func(a_target, a_staggerMult, a_aggressor);
-        // }
+        static void TryStagger(RE::Actor* a_target, float a_staggerMult, RE::Actor* a_aggressor) {
+            GetSingleton()->appliedStagger = true;
+            GetSingleton()->staggerThread = std::this_thread::get_id();
+            using func_t = decltype(&TryStagger);
+            REL::Relocation<func_t> func{REL::RelocationID(36700, 37710)};
+            func(a_target, a_staggerMult, a_aggressor);
+        }
 
         static void Install() {
             auto& trampoline = SKSE::GetTrampoline();

@@ -35,6 +35,11 @@ bool IsBlocking(RE::Actor* actor) {
     return actor->GetGraphVariableBool("Isblocking", state) && state;
 }
 
+bool IsStaggering(RE::Actor* actor) {
+    bool state = false;
+    return actor->GetGraphVariableBool("IsStaggering", state) && state;
+}
+
 float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttackData* atkData) {
     Actor* actor = skyrim_cast<Actor*>(avOwner);
 
@@ -102,12 +107,14 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             // It should be shield
             TESObjectARMO* shield = equip->As<TESObjectARMO>();
 
-            float actualWeight = shield->GetWeight() < 1 ? 1 : shield->GetWeight();
+            logger::info("Bashes with {} | Weight {}", shield->GetName(), shield->GetWeight());
+
+            float actualCost = shield->GetWeight() < 1 ? 1 : shield->GetWeight();
             calculateSkillEfficiency(actor, ActorValue::kBlock, &skillEfficiency);
             logger::info("Efficiency {}% (Block skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kBlock));
             logger::info("Bashes with {}", shield->GetName());
             // costBase = ((shield->GetWeight() * bashMult) + bashBase) * skillEfficiency;
-            calculateStaminaCost(actualWeight, bashBase, bashMult, skillEfficiency, &costBase);
+            calculateStaminaCost(actualCost, bashBase, bashMult, skillEfficiency, &costBase);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, shield, &perkMult);
@@ -116,9 +123,9 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         } else if (equip->IsWeapon()) {
             // It should be weapon
             TESObjectWEAP* weapon = equip->As<TESObjectWEAP>();
-            float actualWeight = weapon->GetWeight() < 1 ? costBase : weapon->GetWeight();
-            logger::info("Bashes with {} (weight {})", weapon->GetName(), actualWeight);
+            logger::info("Bashes with {} | Weight {}", weapon->GetName(), weapon->GetWeight());
 
+            float actualCost = weapon->GetWeight() < 1 ? costBase : weapon->GetWeight();
             if (weapon->IsOneHandedAxe() || weapon->IsOneHandedSword() || weapon->IsOneHandedMace() || weapon->IsOneHandedDagger()) {
                 calculateSkillEfficiency(actor, ActorValue::kOneHanded, &skillEfficiency);
                 logger::info("Efficiency {}% (One-Handed skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kOneHanded));
@@ -133,7 +140,7 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             }
 
             // costBase = ((weapon->GetWeight() * bashMult) + bashBase) * skillEfficiency;
-            calculateStaminaCost(actualWeight, bashBase, bashMult, skillEfficiency, &costBase);
+            calculateStaminaCost(actualCost, bashBase, bashMult, skillEfficiency, &costBase);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
@@ -172,7 +179,7 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         }
 
         TESObjectWEAP* weapon = equip->GetObject()->As<TESObjectWEAP>();
-        logger::info("Swings with {}", weapon->GetName());
+        logger::info("Swings with {} | Weight {}", weapon->GetName(), weapon->GetWeight());
 
         // float tester = 0;
         // Hooks::CombatStamina::calculateSkillEfficiency(actor, ActorValue::kOneHanded, &tester);
@@ -189,11 +196,11 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             logger::info("You shouldn't be here!");
         }
 
-        float actualWeight = weapon->GetWeight() < 1 ? costBase : weapon->GetWeight();
-        // costBase = ((actualWeight * swingMult) + swingBase) * skillEfficiency;
+        float actualCost = weapon->GetWeight() < 1 ? costBase : weapon->GetWeight();
+        // costBase = ((actualCost * swingMult) + swingBase) * skillEfficiency;
 
         // At the minimum, 1 stamina must be spent
-        calculateStaminaCost(actualWeight, swingBase, swingMult, skillEfficiency, &costBase);
+        calculateStaminaCost(actualCost, swingBase, swingMult, skillEfficiency, &costBase);
 
         BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
         logger::info("Perk mult: {}", perkMult);
@@ -213,7 +220,12 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
     return _ActionStaminaCost(avOwner, atkData);
 }
 
-void Hooks::CombatStamina::calculateStaminaCost(float weight, float base, float mult, float efficiency, float* ret) { *ret = ((weight * mult) + base) * efficiency; }
+void Hooks::CombatStamina::calculateStaminaCost(float weight, float base, float mult, float efficiency, float* ret) {
+    *ret = ((weight * mult) * efficiency) + base;
+    if (*ret < 1) {
+        *ret = 1;
+    }
+}
 
 void Hooks::CombatStamina::calculateSkillEfficiency(Actor* actor, ActorValue av, float* ret) {
     float value = actor->AsActorValueOwner()->GetActorValue(av);
@@ -249,7 +261,7 @@ void Hooks::CombatHit::HitImpact(Actor* target, HitData& hitData) {
         }
     }
 
-    logger::info("Stagger received: {}", stgAmt);
+    logger::info("{} stagger amount: {}", source->GetName(), stgAmt);
 
     _HitImpact(target, hitData);
 }
