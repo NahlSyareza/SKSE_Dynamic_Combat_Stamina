@@ -19,7 +19,7 @@ namespace Hooks {
 
         // Helper functions, they don't contribute anything to hook calls
         static void calculateSkillEfficiency(RE::Actor* actor, RE::ActorValue av, float* ret);
-        static void calculateStaminaCost(float weight, float base, float mult, float efficiency, float* ret);
+        static void calculateStaminaCost(float weight, float base, float mult, float efficiency, bool skill_scaling, float* ret);
 
         static void Install() {
             auto& trampoline = SKSE::GetTrampoline();

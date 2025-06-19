@@ -79,6 +79,10 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
 
     float powerMult = mINI::GetIniFloat(mini, "Configurations", "powerMult");
 
+    bool skill_scaling = mINI::GetIniBool(mini, "Configurations", "skillScaling");
+    std::string skill_scaling_msg = skill_scaling ? "Skill scaling enabled" : "Skill scaling disabled";
+    logger::info("{}", skill_scaling_msg);
+
     bool hasShield = Hooks::getEquippedShield(actor);
 
     // if (hasShield) {
@@ -114,10 +118,11 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             logger::info("Efficiency {}% (Block skill {})", (1 - skillEfficiency) * 100, actor->AsActorValueOwner()->GetActorValue(ActorValue::kBlock));
             logger::info("Bashes with {}", shield->GetName());
             // costBase = ((shield->GetWeight() * bashMult) + bashBase) * skillEfficiency;
-            calculateStaminaCost(actualCost, bashBase, bashMult, skillEfficiency, &costBase);
+            calculateStaminaCost(actualCost, bashBase, bashMult, skillEfficiency, skill_scaling, &costBase);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, shield, &perkMult);
+
             logger::info("Perk mult: {}", perkMult);
 
         } else if (equip->IsWeapon()) {
@@ -140,10 +145,11 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
             }
 
             // costBase = ((weapon->GetWeight() * bashMult) + bashBase) * skillEfficiency;
-            calculateStaminaCost(actualCost, bashBase, bashMult, skillEfficiency, &costBase);
+            calculateStaminaCost(actualCost, bashBase, bashMult, skillEfficiency, skill_scaling, &costBase);
 
             // Potential error
             BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
+
             logger::info("Perk mult: {}", perkMult);
         } else {
             logger::info("Bashes with {} ???", equip->GetName());
@@ -200,9 +206,10 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
         // costBase = ((actualCost * swingMult) + swingBase) * skillEfficiency;
 
         // At the minimum, 1 stamina must be spent
-        calculateStaminaCost(actualCost, swingBase, swingMult, skillEfficiency, &costBase);
+        calculateStaminaCost(actualCost, swingBase, swingMult, skillEfficiency, skill_scaling, &costBase);
 
         BGSEntryPoint::HandleEntryPoint(BGSEntryPoint::ENTRY_POINT::kModPowerAttackStamina, actor, weapon, &perkMult);
+
         logger::info("Perk mult: {}", perkMult);
 
         if (atkData->data.flags.any(AttackData::AttackFlag::kPowerAttack)) {
@@ -220,7 +227,8 @@ float Hooks::CombatStamina::ActionStaminaCost(ActorValueOwner* avOwner, BGSAttac
     return _ActionStaminaCost(avOwner, atkData);
 }
 
-void Hooks::CombatStamina::calculateStaminaCost(float weight, float base, float mult, float efficiency, float* ret) {
+void Hooks::CombatStamina::calculateStaminaCost(float weight, float base, float mult, float efficiency, bool skill_scaling, float* ret) {
+    efficiency = skill_scaling ? efficiency : 1;
     *ret = ((weight * mult) * efficiency) + base;
     if (*ret < 1) {
         *ret = 1;
@@ -236,7 +244,7 @@ void Hooks::CombatStamina::calculateSkillEfficiency(Actor* actor, ActorValue av,
     *ret = 1 - (floor(eff) / 100);
 }
 
-// Currently unused
+// Not used for anything. Left it here just because.
 void Hooks::CombatHit::HitImpact(Actor* target, HitData& hitData) {
     auto mini = mINI::GetIniFile("Data/SKSE/Plugins/DCS-DynamicCombatStamina.ini");
     bool enableContextualStagger = mINI::GetIniBool(mini, "Experimental", "enableContextualStagger");
